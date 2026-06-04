@@ -1,0 +1,8 @@
+.px-state
+*.py[co]
+desktop.ini
+Thumbs.db
+__pycache__/
+.venv/
+.vscode/
+*.log

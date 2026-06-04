@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="plugin.program.sickrage"
+       name="SickRage"
+       version="2.2.0"
+       provider-name="ChuckyEvans">
+    <requires>
+        <import addon="xbmc.python" version="3.0.0"/>
+    </requires>
+    <extension point="xbmc.python.pluginsource" library="addon.py">
+        <provides>executable</provides>
+    </extension>
+    <extension point="xbmc.addon.metadata">
+        <summary>SickRage</summary>
+        <description>Control SickRage from within Kodi. Discover recommended shows, manage your library, seasons, episodes, history, backlog and upcoming. Powered by TVmaze &amp; TheTVDB.</description>
+        <platform>all</platform>
+        <assets>
+        <icon>icon.png</icon>
+        </assets>
+    </extension>
+</addon>
