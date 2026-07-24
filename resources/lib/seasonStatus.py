@@ -24,26 +24,12 @@ def action():
     status = statuses[statusIndex]
 
     try:
-        episodes = util.api.getSeasons(showId, {'season': season})
-        if not episodes:
-            util.message('Season Status', 'No episodes found for season')
-            return
-
-        failed = []
-        updated = 0
-        for ep_num in episodes.keys():
-            result = util.api.doEpisodeSetStatus(showId, int(season), int(ep_num), status)
-            if result.get('result') == 'success':
-                updated += 1
-            else:
-                failed.append(str(ep_num))
-                util.log('seasonStatus: failed episode %s: %s' % (ep_num, result))
-
-        xbmc.executebuiltin('Container.Refresh')
-        if failed:
-            util.message('Season Status',
-                         'Updated %d episodes; %d failed.' % (updated, len(failed)),
-                         'Check the Kodi log for details.')
+        # Use backend bulk operation where supported: pass episode=None to set whole season
+        result = util.api.doEpisodeSetStatus(showId, int(season), None, status)
+        if result.get('result') == 'success':
+            xbmc.executebuiltin('Container.Refresh')
+        else:
+            util.message('Season Status', 'Failed to set season status', str(result))
     except Exception as e:
         util.message('Season Status', 'Failed to set season status', str(e))
 

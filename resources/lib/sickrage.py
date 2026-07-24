@@ -297,12 +297,14 @@ class API:
         return self.request('show.setquality', params)
         
     def doEpisodeSetStatus(self, id, season, episode, status):
-        return self.request('episode.setstatus', {
+        params = {
             'indexerid': id,
             'season': season,
-            'episode': episode,
             'status': status
-        })
+        }
+        if episode is not None:
+            params['episode'] = episode
+        return self.request('episode.setstatus', params)
 
     def doEpisodeSearch(self, id, season, episode):
         return self.request('episode.search', {
