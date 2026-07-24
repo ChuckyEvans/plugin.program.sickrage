@@ -9,11 +9,12 @@
         <setting id="password" type="text" label="Password" default=""/>
     </category>       
     <category label="Formats">
-        <setting id="dateFormat" type="labelenum" label="Dates" values="M/D/Y|D/M/Y" default="M/D/Y"/>
-        <setting id="timeFormat" type="labelenum" label="Times" values="AM/PM|24 Hour" default="AM/PM"/>
+        <setting id="dateFormat" type="enum" label="Dates" values="M/D/Y|D/M/Y" default="M/D/Y"/>
+        <setting id="timeFormat" type="enum" label="Times" values="AM/PM|24 Hour" default="AM/PM"/>
     </category>
     <category label="Recommended">
-        <setting id="rec_source" type="labelenum" label="Catalogue Source" values="TVmaze|Episodate" default="TVmaze"/>
-        <setting id="rec_pages"  type="labelenum" label="Pages to fetch (250 shows each)" values="3|5|8|10" default="5"/>
+        <setting id="rec_source" type="enum" label="Catalogue Source" values="TVmaze|Episodate|Trakt|TMDb|IMDb|Both|All" default="TVmaze"/>
+        <setting id="rec_pages"  type="enum" label="Pages to fetch (250 shows each)" values="3|5|8|10" default="5"/>
     </category>
+    <!-- Jackett settings removed from UI -->
 </settings>

@@ -33,8 +33,26 @@ def menu():
 
         url  = util.getShowURL(show['tvdbid'])
         li   = xbmcgui.ListItem(label=label)
-        icon = util.getIcon(icon_name)
-        li.setArt({'icon': icon, 'thumb': icon})
+        # Use show poster image if available so the left pane shows the poster
+        try:
+            poster = util.api.getShowPoster(show.get('tvdbid'))
+        except Exception:
+            poster = None
+        if poster:
+            try:
+                _poster = util.maybe_cache_image(poster, subdir='poster_cache') or poster
+            except Exception:
+                _poster = poster
+            li.setArt({'icon': _poster, 'thumb': _poster})
+            util.set_video_info(li, name=show.get('show_name',''), summary=show.get('overview',''), premiered=show.get('first_aired',''), image=poster)
+        else:
+            icon = util.getIcon(icon_name)
+            try:
+                _icon = util.maybe_cache_image(icon, subdir='poster_cache') or icon
+            except Exception:
+                _icon = icon
+            li.setArt({'icon': _icon, 'thumb': _icon})
+            util.set_video_info(li, name=show.get('show_name',''), summary=show.get('overview',''), premiered=show.get('first_aired',''), image=icon)
         li.addContextMenuItems([
             ('Refresh list', util.getContextCommand('refresh'))
         ], True)

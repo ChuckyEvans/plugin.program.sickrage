@@ -17,6 +17,17 @@ def menu():
                 label = util.formatEpisodeName(ep),
                 iconImage = util.getIcon('wanted' if ep['status'] == 3 else 'qual')
             )
+            # populate metadata for consistent display
+            poster = util.api.getShowPoster(show['indexerid']) if show.get('indexerid') else ''
+            try:
+                try:
+                    _poster = util.maybe_cache_image(poster, subdir='poster_cache') or util.getIcon('wanted')
+                except Exception:
+                    _poster = poster or util.getIcon('wanted')
+                listItem.setArt({'icon': _poster})
+            except Exception:
+                pass
+            util.set_video_info(listItem, name=util.formatEpisodeName(ep), summary=ep.get('overview',''), network=show.get('network',''), image=poster)
             listItem.addContextMenuItems([
                 ('Refresh list', util.getContextCommand('refresh'))
             ], True)

@@ -1,0 +1,258 @@
+import xbmcplugin
+import xbmcgui
+import xbmcaddon
+import xbmc
+import urllib
+from urllib.parse import urlparse
+import pprint
+import sys
+import os
+import shutil
+import xml.etree.ElementTree as ET
+
+plugin = xbmcaddon.Addon(id = 'plugin.program.sickrage')
+
+import resources.lib.sickrage as sickrage
+
+def log(obj):
+    if not isinstance(obj, str):
+        msg = pprint.pformat(obj)
+    else:
+        msg = str(obj)
+    xbmc.log('Sickrage plugin: ' + msg, xbmc.LOGINFO)
+
+def getShowURL(id):    
+    return pluginURL + '?' + urllib.parse.urlencode({
+        'vf': 'seasons',
+        'id': id
+    })
+    
+def getContextCommand(cmd, args = []):
+    cmd = 'XBMC.RunScript(special://home/addons/plugin.program.sickrage/resources/lib/' + cmd + '.py'
+    if args:
+        args = [str(i) for i in args]
+        cmd = cmd + ', ' + ', '.join(args)
+    cmd = cmd + ')'
+    return cmd
+
+def getIcon(name):
+    return os.path.join(iconDir, name + '.png')
+    
+def getFolderURL(vf):
+    params = {'vf': vf}
+    url = pluginURL + '?' + urllib.parse.urlencode(params)
+    return url
+
+def getActionURL(action, params = {}):
+    params['action'] = action
+    url = pluginURL + '?' + urllib.parse.urlencode(params)
+    return url
+    
+def getKWArguments(argv):
+    if not argv:
+        return {}
+    if argv.startswith('?'):
+        argv = argv[1:]
+    #log('argv is now ' + argv)
+    #args = urlparse.parse.parse_qs(argv)
+    args = urllib.parse.parse_qs(argv)
+    #log(args)
+    newArgs = {}
+    for key, val in args.items():
+        #log('key=' + key)
+        if len(val) == 1:
+            newArgs[key] = val[0]
+        else:
+            newArgs[key] = val
+    return newArgs
+
+def message(header, line1, line2=None, line3=None):
+    dialog = xbmcgui.Dialog()
+    msg = line1
+    if line2:
+        msg += '\n' + line2
+    if line3:
+        msg += '\n' + line3
+    dialog.ok(header, msg)
+
+def formatDate(date):
+    # assumes YYYY-MM-DD
+    if not date:
+        return ''
+    date = date.split('-')
+    fmt = plugin.getSetting('dateFormat')
+    if fmt == 'M/D/Y':
+        return date[1] + '/' + date[2] + '/' + date[0]
+    elif fmt == 'D/M/Y':
+        return date[2] + '/' + date[1] + '/' + date[0]
+    else:
+        return '?'
+
+def formatTime(time, ampm = None):
+    # assumes 'HH:MM' or 'HH:MM', 'AM'
+    time = time.split(':')
+    time[0] = int(time[0])
+    if not ampm:
+        if time[0] > 12:
+            ampm = 'PM'
+            time[0] = time[0] - 12
+        else:
+            ampm = 'AM'
+            if time[0] == 0:
+                time[0] = 12
+    time[0] = str(time[0])
+    fmt = plugin.getSetting('timeFormat')
+    if fmt == 'AM/PM':
+        return time[0] + ':' + time[1] + ' ' + ampm
+    elif fmt == '24 Hour':
+        return str(int(time[0]) + 12) + ':' + time[1]
+    else:
+        return '?'
+        
+def formatDateTime(dateTime):
+    # assumes YYYY-MM-DD HH:MM
+    dateTime = dateTime.split(' ')
+    date = formatDate(dateTime[0])
+    time = formatTime(dateTime[1])
+    return date + ', ' + time
+
+def formatEpisodeName(show):
+    out = show['show_name'] + ' - ' + str(show['season']) + 'x' + ('%02d' % show['episode'])
+    if 'ep_name' in show:
+        out = out + ' - ' + show['ep_name']
+    return out
+
+def isInt(s):
+    try:
+        int(s)
+        return True
+    except ValueError:
+        return False
+
+pluginURL = sys.argv[0]
+if pluginURL.endswith('.py'):
+    pluginId = None
+    pluginArgs = sys.argv[1:]
+else:
+    pluginId = int(sys.argv[1])
+    pluginArgs = getKWArguments(sys.argv[2])
+    
+api = sickrage.API()
+iconDir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'icons')
+
+log(sys.argv)
+#log('iconDir: ' + iconDir)
+#log('pluginURL: ' + pluginURL)
+#log('pluginId: ' + str(pluginId))
+log(pluginArgs)
+
+
+def migrate_legacy_settings():
+    """Safely migrate legacy/malformed settings stored as labels to
+    numeric indices for enum-type settings. This is defensive and will
+    back up the userdata settings.xml before writing.
+    """
+    try:
+        addon_data = xbmc.translatePath('special://profile/addon_data/plugin.program.sickrage')
+    except Exception:
+        addon_data = os.path.join(xbmc.translatePath('special://profile'), 'addon_data', 'plugin.program.sickrage')
+
+    settings_path = os.path.join(addon_data, 'settings.xml')
+    # Known enum choices (kept in-sync with resources/settings.xml)
+    enum_choices = {
+        'dateFormat': ['M/D/Y', 'D/M/Y'],
+        'timeFormat': ['AM/PM', '24 Hour'],
+        'rec_source': ['TVmaze', 'Episodate'],
+        'rec_pages': ['3', '5', '8', '10'],
+    }
+
+    def _map_value(key, raw):
+        if raw is None:
+            return None
+        raw = str(raw).strip()
+        opts = enum_choices.get(key)
+        # If the raw value matches a known label (even if numeric), return its index
+        if opts and raw in opts:
+            try:
+                return str(opts.index(raw))
+            except Exception:
+                pass
+        # If it's a numeric string that doesn't match a label, assume it's already an index
+        if raw.isdigit():
+            return raw
+        if not opts:
+            return raw
+        try:
+            idx = opts.index(raw)
+            return str(idx)
+        except ValueError:
+            return None
+
+    # First, try to normalize via the addon API (preferred)
+    changed = False
+    for k in enum_choices.keys():
+        try:
+            cur = plugin.getSetting(k)
+        except Exception:
+            cur = None
+        mapped = _map_value(k, cur)
+        if mapped is not None and mapped != cur:
+            try:
+                plugin.setSetting(k, mapped)
+                log('migrate_legacy_settings: set %s -> %s via API' % (k, mapped))
+                changed = True
+            except Exception as e:
+                log('migrate_legacy_settings: failed setSetting %s: %s' % (k, repr(e)))
+
+    # If API route didn't change values (or values unreadable), try editing userdata settings.xml
+    if os.path.exists(settings_path):
+        try:
+            tree = ET.parse(settings_path)
+            root = tree.getroot()
+        except Exception as e:
+            log('migrate_legacy_settings: failed parse %s: %s' % (settings_path, repr(e)))
+            return changed
+
+        # Backup original
+        try:
+            backup = settings_path + '.bak'
+            shutil.copy2(settings_path, backup)
+            log('migrate_legacy_settings: backed up %s -> %s' % (settings_path, backup))
+        except Exception as e:
+            log('migrate_legacy_settings: backup failed: %s' % repr(e))
+
+        updated = False
+        for s in root.findall('.//setting'):
+            sid = s.get('id') or s.get('name')
+            if not sid:
+                continue
+            if sid in enum_choices:
+                # value might be in text or attribute
+                raw = s.text if s.text and s.text.strip() else s.get('value') or s.get('default')
+                mapped = _map_value(sid, raw)
+                if mapped is not None and (s.text or '').strip() != mapped:
+                    s.text = mapped
+                    # remove malformed default attribute if present
+                    if 'default' in s.attrib:
+                        try:
+                            del s.attrib['default']
+                        except Exception:
+                            pass
+                    updated = True
+                    log('migrate_legacy_settings: updated %s -> %s in XML' % (sid, mapped))
+
+        if updated:
+            try:
+                tree.write(settings_path, encoding='utf-8', xml_declaration=True)
+                log('migrate_legacy_settings: wrote sanitized settings.xml')
+                # Attempt to notify Kodi to reload settings (best-effort)
+                try:
+                    xbmc.executebuiltin('Notification(SickRage,migration completed,2000)')
+                except Exception:
+                    pass
+                return True
+            except Exception as e:
+                log('migrate_legacy_settings: write failed: %s' % repr(e))
+                return changed
+
+    return changed

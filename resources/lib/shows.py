@@ -71,15 +71,44 @@ def menu():
 
         show_url = util.getShowURL(show['tvdbid'])
         li = xbmcgui.ListItem(label=label)
-        li.setArt({'icon':  util.api.getShowPoster(show['tvdbid']),
-                   'thumb': util.api.getShowPoster(show['tvdbid'])})
-        li.addContextMenuItems([
-            ('Delete show',          util.getContextCommand('showDelete',     [show['tvdbid']])),
+        poster = util.api.getShowPoster(show['tvdbid'])
+        try:
+            _poster = util.maybe_cache_image(poster, subdir='poster_cache') or poster
+        except Exception:
+            _poster = poster
+        li.setArt({'icon': _poster, 'thumb': _poster})
+        # populate metadata for consistent display across views
+        util.set_video_info(li, name=name, network=network, status=show.get('status', ''), image=poster)
+        # build context menu with stats and optional play-latest
+        ctx = [
+            ('Show Stats',           util.getActionContextCommand('showStats',  {'tvdbid': show['tvdbid']})),
+            ('Set Show Status',      util.getActionContextCommand('showStatus', {'id': show['tvdbid']})),
+            ('Play Latest Downloaded', ''),  # placeholder; replaced below if available
+            ('Delete show',          util.getActionContextCommand('showDelete', {'id': show['tvdbid']})),
             (('Unpause' if paused else 'Pause') + ' show',
-                                     util.getContextCommand('showPauseToggle',[show['tvdbid']])),
-            ('Force search',         util.getContextCommand('showsSearch')),
+                                     util.getActionContextCommand('showPauseToggle', {'id': show['tvdbid']})),
+            ('Force search',         util.getActionContextCommand('forceSearch')),
             ('Refresh list',         util.getContextCommand('refresh'))
-        ], True)
+        ]
+        # If there's a latest downloaded episode, enable the placeholder play action
+        try:
+            latest = util.get_latest_downloaded(show['tvdbid'])
+            if latest:
+                snum, enum = latest
+                play_url = util.getActionURL('playEpisode', {'id': show['tvdbid'], 'season': snum, 'episode': enum})
+                ctx[2] = ('Play Latest Downloaded', 'RunPlugin(%s)' % play_url)
+                try:
+                    li.setLabel(label + '  [COLOR green]▶[/COLOR]')
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Drop the play-latest placeholder if it wasn't populated
+        if not ctx[2][1]:
+            ctx.pop(2)
+
+        li.addContextMenuItems(ctx, True)
         xbmcplugin.addDirectoryItem(handle=util.pluginId, url=show_url,
                                     listitem=li, isFolder=True)
 

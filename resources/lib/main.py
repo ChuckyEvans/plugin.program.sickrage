@@ -24,6 +24,7 @@ def menu():
     add_item('[B]Shows[/B]',         vf='shows',       icon='shows')
     add_item('[B]Recommended[/B]',   vf='recommended', icon='recommended')
     add_item('[B]Upcoming[/B]',      vf='upcoming',    icon='upcoming')
+    # Providers menu removed (Jackett/provider UI deprecated)
     add_item('[B]History[/B]',       vf='history',     icon='history')
     add_item('Force Episode Search', action='forceSearch', icon='wanted', is_folder=False)
 

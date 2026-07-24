@@ -1,0 +1,11 @@
+<settings version="2">
+    <setting id="url">http://192.168.8.10:7081/</setting>
+    <setting id="key">1d97ebb69a5a07163dac099fd30af7e3</setting>
+    <setting id="user" default="true" />
+    <setting id="password" default="true" />
+    <setting id="dateFormat">1</setting>
+    <setting id="timeFormat">1</setting>
+    <setting id="rec_source" default="true">0</setting>
+    <setting id="rec_pages" default="true">0</setting>
+    <!-- Jackett settings removed -->
+</settings>

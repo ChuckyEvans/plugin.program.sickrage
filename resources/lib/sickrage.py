@@ -12,21 +12,92 @@ socket.setdefaulttimeout(40)
 class API:
 
     def getShowBanner(self, id):
-        url = util.plugin.getSetting('url') + 'showPoster/?show=' + str(id) + '&which=banner'
-        return url
+        # Prefer external banner URL from the API (no auth) when available.
+        try:
+            show = self.getShow(id)
+            try:
+                util.log('API show fields for %s: poster=%s, image=%s, banner=%s' % (id, repr(show.get('poster')), repr(show.get('image')), repr(show.get('banner'))))
+            except Exception:
+                pass
+            banner = show.get('banner') or show.get('show_banner') or show.get('poster') or ''
+            if banner and isinstance(banner, str) and banner.startswith('http'):
+                base = (util.plugin.getSetting('url') or '').strip().rstrip('/')
+                if not base or not banner.startswith(base):
+                    try:
+                        return util.cache_image_url(banner, subdir='poster_cache', name='%s_banner' % id)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        return util.cache_poster_url(id, 'banner')
 
     def getShowPoster(self, id):
-        url = util.plugin.getSetting('url') + 'showPoster/?show=' + str(id) + '&which=poster'
-        return url
-    
+        # Prefer external poster URL from the API (no auth) when available.
+        try:
+            show = self.getShow(id)
+            try:
+                util.log('API show fields for %s: poster=%s, image=%s, banner=%s' % (id, repr(show.get('poster')), repr(show.get('image')), repr(show.get('banner'))))
+            except Exception:
+                pass
+            poster = show.get('poster') or show.get('image') or ''
+            if poster and isinstance(poster, str) and poster.startswith('http'):
+                base = (util.plugin.getSetting('url') or '').strip().rstrip('/')
+                if not base or not poster.startswith(base):
+                    try:
+                        return util.cache_image_url(poster, subdir='poster_cache', name='%s_poster' % id)
+                    except Exception:
+                        pass
+            # Fallback: try TVmaze direct search to get a poster URL
+            try:
+                name = show.get('show_name') or show.get('name') or ''
+                if name:
+                    results = self.doSearchTVMazeDirect(name)
+                    if results:
+                        tm = results[0]
+                        tm_poster = tm.get('poster')
+                        if tm_poster:
+                            util.log('Using TVmaze poster for %s: %s' % (id, tm_poster))
+                            return util.cache_image_url(tm_poster, subdir='poster_cache', name='%s_tm_poster' % id)
+            except Exception:
+                pass
+        except Exception:
+            pass
+        return util.cache_poster_url(id, 'poster')
+
     def getShowPosterThumbnail(self, id):
-        url = util.plugin.getSetting('url') + 'showPoster/?show=' + str(id) + '&which=poster_thumb'
-        return url
+        # Try to use an external thumbnail if available via the API.
+        try:
+            show = self.getShow(id)
+            try:
+                util.log('API show fields for %s: poster_thumb=%s, thumbnail=%s, poster=%s' % (id, repr(show.get('poster_thumb')), repr(show.get('thumbnail')), repr(show.get('poster'))))
+            except Exception:
+                pass
+            thumb = show.get('poster_thumb') or show.get('thumbnail') or show.get('poster') or ''
+            if thumb and isinstance(thumb, str) and thumb.startswith('http'):
+                base = (util.plugin.getSetting('url') or '').strip().rstrip('/')
+                if not base or not thumb.startswith(base):
+                    try:
+                        return util.cache_image_url(thumb, subdir='poster_cache', name='%s_poster_thumb' % id)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        return util.cache_poster_url(id, 'poster_thumb')
     
 
     def request(self, cmd, params = {}):
         params['cmd'] = cmd
-        url = util.plugin.getSetting('url') + 'api/' + util.plugin.getSetting('key') + '/?' + urllib.parse.urlencode(params)
+        base = (util.plugin.getSetting('url') or '').strip()
+        key = (util.plugin.getSetting('key') or '').strip()
+        if not base:
+            raise Exception('SickRage base URL is not configured in addon settings.')
+        if not re.match(r'^https?://', base):
+            raise Exception('SickRage base URL must start with http:// or https://')
+        if not key:
+            raise Exception('SickRage API key is not configured in addon settings.')
+        # normalize base to avoid duplicate slashes
+        base = base.rstrip('/') + '/'
+        url = base + 'api/' + key + '/?' + urllib.parse.urlencode(params)
         util.log('API: ' + url)
         req = urllibRequest.Request(url)
         user = util.plugin.getSetting('user')
@@ -154,6 +225,55 @@ class API:
     def getDefaults(self):
         result = self.request('sb.getdefaults')
         return result['data']
+
+    def getIndexers(self):
+        """Return a list of configured indexers.
+        Try several SickRage API endpoints for compatibility, and fall back
+        to addon cached data if available. Returns an empty list on failure.
+        """
+        candidates = ['sb.getindexers', 'indexers', 'sb.searchindexers']
+        for cmd in candidates:
+            try:
+                if cmd == 'sb.searchindexers':
+                    # searchindexers expects a name param; empty name may return all
+                    res = self.request(cmd, {'name': ''})
+                else:
+                    res = self.request(cmd)
+                data = res.get('data') if isinstance(res, dict) else None
+                if not data:
+                    continue
+                # If data is dict, convert to list of entries for callers
+                if isinstance(data, dict):
+                    entries = []
+                    for k, v in data.items():
+                        title = v.get('title') or v.get('name') or k
+                        enabled = bool(v.get('enabled') or v.get('configured'))
+                        entries.append({'name': title, 'enabled': enabled, 'id': k})
+                    return entries
+                # If already list-shaped, try to normalize minimal fields
+                if isinstance(data, list):
+                    entries = []
+                    for v in data:
+                        title = v.get('title') or v.get('name') or v.get('provider') or v.get('id') or 'Unknown'
+                        enabled = bool(v.get('enabled', True))
+                        pid = v.get('id') or v.get('provider') or title
+                        entries.append({'name': title, 'enabled': enabled, 'id': pid})
+                    return entries
+            except Exception as e:
+                util.log('getIndexers: %s failed: %s' % (cmd, repr(e)))
+                continue
+
+        # fallback: use cached Jackett indexers stored in addon_data
+        try:
+            cached = util.read_addon_data('jackett_indexers.json', []) or []
+            # convert cached shape to expected list (title -> name)
+            out = []
+            for e in cached:
+                out.append({'name': e.get('title') or e.get('name') or 'Unknown', 'enabled': bool(e.get('enabled')), 'id': e.get('id')})
+            return out
+        except Exception as e:
+            util.log('getIndexers: fallback read failed: %s' % repr(e))
+            return []
         
     def doAddNewShow(self, id, indexer, location, status, flattenFolders, anime, sceneNumbered, quality):
         return self.request('show.addnew', {
@@ -182,5 +302,12 @@ class API:
             'season': season,
             'episode': episode,
             'status': status
+        })
+
+    def doEpisodeSearch(self, id, season, episode):
+        return self.request('episode.search', {
+            'indexerid': id,
+            'season': season,
+            'episode': episode
         })
         

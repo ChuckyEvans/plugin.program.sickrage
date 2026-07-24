@@ -55,10 +55,28 @@ def addShow(when, show):
     time_part = ('[COLOR %s]%s[/COLOR]  ' % (when_col, time_str)) if time_str else ''
     label     = time_part + ep_label
 
-    icon = util.getIcon(['today', 'soon', 'later'][when])
     url  = util.getShowURL(show['tvdbid'])
     li   = xbmcgui.ListItem(label=label)
-    li.setArt({'icon': icon, 'thumb': icon})
+    # Try to use show poster artwork for a richer left-pane layout
+    try:
+        poster = util.api.getShowPoster(show.get('tvdbid'))
+    except Exception:
+        poster = None
+    if poster:
+        try:
+            _poster = util.maybe_cache_image(poster, subdir='poster_cache') or poster
+        except Exception:
+            _poster = poster
+        li.setArt({'icon': _poster, 'thumb': _poster})
+        util.set_video_info(li, name=show.get('show_name',''), summary=show.get('overview',''), premiered=show.get('airdate',''), image=poster)
+    else:
+        icon = util.getIcon(['today', 'soon', 'later'][when])
+        try:
+            _icon = util.maybe_cache_image(icon, subdir='poster_cache') or icon
+        except Exception:
+            _icon = icon
+        li.setArt({'icon': _icon, 'thumb': _icon})
+        util.set_video_info(li, name=show.get('show_name',''), summary=show.get('overview',''), premiered=show.get('airdate',''), image=icon)
     li.addContextMenuItems([('Refresh list', util.getContextCommand('refresh'))], True)
     xbmcplugin.addDirectoryItem(handle=util.pluginId, url=url, listitem=li, isFolder=True)
 
