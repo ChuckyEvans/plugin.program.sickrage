@@ -72,10 +72,8 @@ def menu():
         show_url = util.getShowURL(show['tvdbid'])
         li = xbmcgui.ListItem(label=label)
         poster = util.api.getShowPoster(show['tvdbid'])
-        try:
-            _poster = util.maybe_cache_image(poster, subdir='poster_cache') or poster
-        except Exception:
-            _poster = poster
+        # Avoid blocking network poster caching during UI build — let Kodi fetch remote images
+        _poster = poster
         li.setArt({'icon': _poster, 'thumb': _poster})
         # populate metadata for consistent display across views
         util.set_video_info(li, name=name, network=network, status=show.get('status', ''), image=poster)

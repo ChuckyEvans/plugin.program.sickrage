@@ -39,18 +39,13 @@ def menu():
         except Exception:
             poster = None
         if poster:
-            try:
-                _poster = util.maybe_cache_image(poster, subdir='poster_cache') or poster
-            except Exception:
-                _poster = poster
+            # Avoid blocking poster cache; use remote poster URL directly
+            _poster = poster
             li.setArt({'icon': _poster, 'thumb': _poster})
             util.set_video_info(li, name=show.get('show_name',''), summary=show.get('overview',''), premiered=show.get('first_aired',''), image=poster)
         else:
             icon = util.getIcon(icon_name)
-            try:
-                _icon = util.maybe_cache_image(icon, subdir='poster_cache') or icon
-            except Exception:
-                _icon = icon
+            _icon = icon
             li.setArt({'icon': _icon, 'thumb': _icon})
             util.set_video_info(li, name=show.get('show_name',''), summary=show.get('overview',''), premiered=show.get('first_aired',''), image=icon)
         li.addContextMenuItems([

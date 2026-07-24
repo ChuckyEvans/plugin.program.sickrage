@@ -63,18 +63,13 @@ def addShow(when, show):
     except Exception:
         poster = None
     if poster:
-        try:
-            _poster = util.maybe_cache_image(poster, subdir='poster_cache') or poster
-        except Exception:
-            _poster = poster
+        # Use remote poster URL directly to avoid blocking UI while caching
+        _poster = poster
         li.setArt({'icon': _poster, 'thumb': _poster})
         util.set_video_info(li, name=show.get('show_name',''), summary=show.get('overview',''), premiered=show.get('airdate',''), image=poster)
     else:
         icon = util.getIcon(['today', 'soon', 'later'][when])
-        try:
-            _icon = util.maybe_cache_image(icon, subdir='poster_cache') or icon
-        except Exception:
-            _icon = icon
+        _icon = icon
         li.setArt({'icon': _icon, 'thumb': _icon})
         util.set_video_info(li, name=show.get('show_name',''), summary=show.get('overview',''), premiered=show.get('airdate',''), image=icon)
     li.addContextMenuItems([('Refresh list', util.getContextCommand('refresh'))], True)
