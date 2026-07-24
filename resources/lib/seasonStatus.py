@@ -13,22 +13,8 @@ def action():
         return
 
     statuses = util.STATUS_OPTIONS
-    # Determine current season status if all episodes share the same status
-    currentStatus = None
-    try:
-        episodes = util.api.getSeasons(showId, {'season': season})
-        if episodes and isinstance(episodes, dict):
-            st_set = set()
-            for ep in episodes.values():
-                s = (ep.get('status') or '').lower()
-                if s:
-                    st_set.add(s)
-            if len(st_set) == 1:
-                currentStatus = list(st_set)[0]
-    except Exception:
-        currentStatus = None
-
-    statusList = [('* ' if status == currentStatus else '') + status.title() for status in statuses]
+    # Avoid prefetching episodes to compute a uniform season status — keep UI responsive
+    statusList = [status.title() for status in statuses]
 
     dialog = xbmcgui.Dialog()
     statusIndex = dialog.select('Season Status', statusList)

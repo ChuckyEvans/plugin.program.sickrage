@@ -17,25 +17,9 @@ def action():
         showName = 'Show'
 
     statuses = util.STATUS_OPTIONS
-    # Determine current show-level status if all episodes share the same status
-    currentStatus = None
+    # Use show metadata to detect current status and prefix it with a star
     try:
-        seasons = util.api.getSeasonList(showId)
-        st_set = set()
-        if seasons:
-            for s in seasons:
-                try:
-                    eps = util.api.getSeasons(showId, {'season': s})
-                    if not eps:
-                        continue
-                    for ep in eps.values():
-                        st = (ep.get('status') or '').lower()
-                        if st:
-                            st_set.add(st)
-                except Exception:
-                    continue
-        if len(st_set) == 1:
-            currentStatus = list(st_set)[0]
+        currentStatus = (show.get('status') or '').lower()
     except Exception:
         currentStatus = None
 
